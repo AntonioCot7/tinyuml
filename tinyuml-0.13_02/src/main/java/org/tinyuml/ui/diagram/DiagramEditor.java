@@ -41,6 +41,7 @@ import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.KeyStroke;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
@@ -251,6 +252,16 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    */
   public void deleteSelection() {
     Collection<DiagramElement> elements = getSelectedElements();
+    // RF-004: ask for confirmation when deleting more than one element
+    if (elements.size() > 1) {
+      int answer = JOptionPane.showConfirmDialog(this,
+        "Se eliminar\u00e1n " + elements.size() + " elementos. \u00bfDesea continuar?",
+        "Confirmar eliminaci\u00f3n", JOptionPane.YES_NO_OPTION,
+        JOptionPane.WARNING_MESSAGE);
+      if (answer != JOptionPane.YES_OPTION) {
+        return; // cancelled: nothing is deleted, the elements stay
+      }
+    }
     execute(new DeleteElementCommand(this, elements));
   }
   /**
