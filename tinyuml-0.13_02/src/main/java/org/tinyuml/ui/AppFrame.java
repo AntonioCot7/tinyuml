@@ -19,6 +19,10 @@
  */
 package org.tinyuml.ui;
 
+import java.awt.FlowLayout;
+import java.util.List;
+import org.tinyuml.draw.Connection;
+import org.tinyuml.draw.LabelSource;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Desktop;
@@ -87,6 +91,8 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private JLabel coordLabel = new JLabel("    ");
   private JLabel memLabel = new JLabel("    ");
   private JLabel countLabel = new JLabel("    ");
+  private JLabel selectionLabel = new JLabel("Sin selecci\u00f3n");     // RF-002
+  private JLabel selectedCountLabel = new JLabel("Seleccionados: 0");    // RF-003
   private UmlModel umlModel;
   private DiagramEditor currentEditor;
   private transient Timer timer = new Timer();
@@ -204,6 +210,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     currentEditor.addAppCommandListener(editorDispatcher);
     currentEditor.addAppCommandListener(this);
     updateElementCount();
+    updateSelectionInfo();
     JScrollPane spane = new JScrollPane(currentEditor);
     JPanel editorPanel = new JPanel(new BorderLayout());
     spane.getVerticalScrollBar().setUnitIncrement(10);
@@ -250,7 +257,11 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     JPanel statusbar = new JPanel(new BorderLayout());
     statusbar.add(coordLabel, BorderLayout.WEST);
     statusbar.add(memLabel, BorderLayout.EAST);
-    statusbar.add(countLabel, BorderLayout.CENTER);
+    JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+    infoPanel.add(countLabel);          // RF-001
+    infoPanel.add(selectionLabel);      // RF-002
+    infoPanel.add(selectedCountLabel);  // RF-003
+    statusbar.add(infoPanel, BorderLayout.CENTER);
     getContentPane().add(statusbar, BorderLayout.SOUTH);
   }
 
@@ -285,6 +296,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   public void stateChanged(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
     updateElementCount();
+    updateSelectionInfo();
   }
 
   /**
@@ -295,6 +307,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     staticToolbarManager.doClick("SELECT_MODE");
     updateMenuAndToolbars(editor);
     updateElementCount();
+    updateSelectionInfo();
   }
 
   /**
@@ -303,6 +316,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   public void elementRemoved(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
     updateElementCount();
+    updateSelectionInfo();
   }
 
   /**
@@ -371,6 +385,68 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     toolbarmanager.enableButton("COPY", hasSelection);
      
     toolbarmanager.enableButton("DELETE", hasSelection);
+    updateSelectionInfo();
+  }
+
+  /**
+   * RF-002 y RF-003: Updates the selection information in the status bar.
+   */
+  private void updateSelectionInfo() {
+    List<DiagramElement> selected = new LinkedList<DiagramElement>();
+    if (currentEditor != null) {
+      for (DiagramElement element : currentEditor.getSelectedElements()) {
+        // clicking an empty area selects the diagram itself: not an element
+        if (element != currentEditor.getDiagram()) {
+          selected.add(element);
+        }
+      }
+    }
+    // RF-003
+    selectedCountLabel.setText("Seleccionados: " + selected.size());
+    // RF-002
+    if (selected.isEmpty()) {
+      selectionLabel.setText("Sin selecci\u00f3n");
+    } else if (selected.size() == 1) {
+      DiagramElement element = selected.get(0);
+      selectionLabel.setText(getCategory(element) + ": " + getName(element));
+    } else {
+      selectionLabel.setText("Selecci\u00f3n m\u00faltiple");
+    }
+  }
+
+  /**
+   * Returns the category of the specified element.
+   * @param element the element
+   * @return the category name
+   */
+  private String getCategory(DiagramElement element) {
+    if (element instanceof PackageElement) {
+      return "Package";
+    } else if (element instanceof ClassElement) {
+      return "Class";
+    } else if (element instanceof ComponentElement) {
+      return "Component";
+    } else if (element instanceof NoteElement) {
+      return "Note";
+    } else if (element instanceof Connection) {
+      return "Relation";
+    }
+    return element.getClass().getSimpleName();
+  }
+
+  /**
+   * Returns the name (label text) of the specified element.
+   * @param element the element
+   * @return the name, or "(sin nombre)" if it has none
+   */
+  private String getName(DiagramElement element) {
+    if (element instanceof LabelSource) {
+      String text = ((LabelSource) element).getLabelText();
+      if (text != null && text.trim().length() > 0) {
+        return text.replace('\n', ' ');   // notes can have several lines
+      }
+    }
+    return "(sin nombre)";
   }
 
   // ************************************************************************
