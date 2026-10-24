@@ -47,4 +47,13 @@ public final class Scaling {
    * @return the scaling factor
    */
   public double getScaleFactor() { return scaleFactor; }
+
+  /**
+   * RF-005: Creates a scaling with an arbitrary factor.
+   * @param factor the scaling factor
+   * @return the new Scaling object
+   */
+  public static Scaling create(double factor) {
+    return new Scaling(factor);
+  }
 }

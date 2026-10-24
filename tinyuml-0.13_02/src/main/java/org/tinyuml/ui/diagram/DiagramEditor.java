@@ -24,6 +24,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.geom.Rectangle2D;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -42,7 +43,9 @@ import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.JViewport;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.undo.UndoManager;
@@ -205,9 +208,10 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    * This also influences the scroll pane which the component is contained in.
    */
   private void setToDiagramSize() {
+    double factor = scaling.getScaleFactor();
     setPreferredSize(new Dimension(
-      (int) (diagram.getSize().getWidth() + MARGIN_RIGHT + MARGIN_LEFT),
-      (int) (diagram.getSize().getHeight() + MARGIN_BOTTOM + MARGIN_TOP)));
+      (int) ((diagram.getSize().getWidth() + MARGIN_RIGHT + MARGIN_LEFT) * factor),
+      (int) ((diagram.getSize().getHeight() + MARGIN_BOTTOM + MARGIN_TOP) * factor)));
     invalidate();
   }
 
@@ -604,7 +608,51 @@ DiagramEditorNotification, DiagramOperations, NodeChangeListener {
    */
   public void setScaling(Scaling aScaling) {
     scaling = aScaling;
+    setToDiagramSize();
+    revalidate();
     repaint();
+  }
+
+  /**
+   * RF-005: Adjusts the zoom and the visible area so that all the elements
+   * of the diagram are visible. Positions and sizes of the elements are not
+   * modified, only the view (scaling and scroll position).
+   */
+  public void fitToWindow() {
+    JViewport viewport = (JViewport)
+      SwingUtilities.getAncestorOfClass(JViewport.class, this);
+    Rectangle2D bounds = null;
+    for (DiagramElement element : diagram.getChildren()) {
+      if (element instanceof Connection) {
+        continue; // relations always lie between their nodes
+      }
+      if (bounds == null) {
+        bounds = (Rectangle2D) element.getAbsoluteBounds().clone();
+      } else {
+        bounds.add(element.getAbsoluteBounds());
+      }
+    }
+    if (viewport == null || bounds == null) {
+      setScaling(Scaling.SCALING_100); // empty diagram
+      return;
+    }
+    double margin = 20;
+    Dimension extent = viewport.getExtentSize();
+    double factor = Math.min(
+      (extent.getWidth() - 2 * margin) / bounds.getWidth(),
+      (extent.getHeight() - 2 * margin) / bounds.getHeight());
+    factor = Math.max(0.1, Math.min(factor, 4.0));
+    setScaling(Scaling.create(factor));
+
+    final Rectangle target = new Rectangle(
+      (int) (bounds.getX() * factor - margin),
+      (int) (bounds.getY() * factor - margin),
+      (int) (bounds.getWidth() * factor + 2 * margin),
+      (int) (bounds.getHeight() * factor + 2 * margin));
+    // scroll after the new preferred size has been applied
+    SwingUtilities.invokeLater(new Runnable() {
+      public void run() { scrollRectToVisible(target); }
+    });
   }
 
   /**
